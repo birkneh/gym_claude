@@ -228,6 +228,45 @@
       .hdr-row2 { gap: 6px; }
       .rest-widget { left: 12px; right: 12px; }
     }
+    /* ── SUMMARY MODAL ── */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.65); z-index: 500;
+      display: flex; align-items: center; justify-content: center; padding: 16px; }
+    .modal { background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+      width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0,0,0,.6); }
+    .modal-hdr { display: flex; justify-content: space-between; align-items: flex-start;
+      padding: 18px 20px 14px; border-bottom: 1px solid var(--border); }
+    .modal-title { font-size: 1.15rem; font-weight: 800; }
+    .modal-sub   { font-size: .82rem; color: var(--muted); margin-top: 3px; }
+    .modal-close { background: none; border: none; cursor: pointer; color: var(--muted); font-size: 1.1rem; line-height: 1; transition: color .15s; }
+    .modal-close:hover { color: var(--text); }
+    .modal-body { padding: 18px 20px; }
+    .modal-footer { padding: 12px 20px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
+    .sum-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-bottom: 20px; }
+    .sum-stat  { background: var(--card2); border-radius: 10px; padding: 13px; text-align: center; }
+    .sum-stat-val { font-size: 1.3rem; font-weight: 800; color: var(--accent-l); line-height: 1; }
+    .sum-stat-val.green  { color: var(--green); }
+    .sum-stat-val.yellow { color: var(--yellow); }
+    .sum-stat-lbl { font-size: .69rem; color: var(--muted); margin-top: 5px; text-transform: uppercase; letter-spacing: .05em; }
+    .sum-sec-hdr  { font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 600; margin-bottom: 8px; }
+    .sum-ex-row   { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--border); }
+    .sum-ex-row:last-child { border-bottom: none; }
+    .sum-ex-name  { flex: 1; font-size: .87rem; }
+    .sum-ex-vol   { font-size: .79rem; color: var(--muted); white-space: nowrap; }
+    .sum-ex-prog  { display: flex; align-items: center; gap: 6px; }
+    .sum-bar-bg   { width: 52px; height: 5px; background: var(--border); border-radius: 3px; }
+    .sum-bar-fill { height: 100%; border-radius: 3px; background: var(--green); }
+    .sum-sets     { font-size: .76rem; color: var(--muted); white-space: nowrap; min-width: 28px; }
+    .sum-acts     { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 5px; }
+    .sum-act-pill { font-size: .78rem; padding: 4px 10px; border-radius: 20px;
+      background: rgba(34,197,94,.12); color: var(--green); border: 1px solid rgba(34,197,94,.25); }
+    /* History meta strip */
+    .h-meta { display: flex; gap: 6px; flex-wrap: wrap; padding: 7px 13px; background: rgba(99,102,241,.05); border-bottom: 1px solid var(--border); }
+    .h-meta-pill { font-size: .74rem; color: var(--muted); padding: 2px 8px; background: rgba(99,102,241,.07); border-radius: 20px; }
+    /* Finish button */
+    .finish-btn { width: 100%; justify-content: center; padding: 13px !important; margin-top: 6px;
+      font-size: .95rem !important; letter-spacing: .01em; }
+
     .hidden { display: none !important; }
   </style>
 </head>
@@ -276,6 +315,7 @@
     <strong>Focus:</strong> Compound press + pull. Target <strong>progressive overload</strong> — add 2.5 kg when you reach the top of your rep range. Rest timer auto-starts after each set.
   </div>
   <div id="exs-A"></div>
+  <button class="btn btn-green finish-btn" onclick="finishWorkout('A')">&#9989; Finish Workout &amp; View Summary</button>
 </div>
 
 <!-- PANEL B -->
@@ -300,6 +340,7 @@
     <strong>Hip Thrusts</strong> are safe and highly effective. Use lighter loads with controlled form. Stop if sharp pain occurs.
   </div>
   <div id="exs-B"></div>
+  <button class="btn btn-green finish-btn" onclick="finishWorkout('B')">&#9989; Finish Workout &amp; View Summary</button>
 </div>
 
 <!-- PANEL C -->
@@ -323,6 +364,7 @@
     <strong>Focus:</strong> Different angles from Day A for full stimulation. Keep intensity moderate — third session of the week. Every major muscle is hit <strong>twice</strong>.
   </div>
   <div id="exs-C"></div>
+  <button class="btn btn-green finish-btn" onclick="finishWorkout('C')">&#9989; Finish Workout &amp; View Summary</button>
 </div>
 
 <!-- PANEL HISTORY -->
@@ -400,6 +442,24 @@
         <p style="margin-bottom:9px;">&#127919; <strong style="color:var(--text);">Progressive overload:</strong> +2.5 kg compounds, +1–2.5 kg isolations when you hit the top rep range.</p>
         <p>&#129517; <strong style="color:var(--text);">Creatine monohydrate:</strong> 3–5 g/day consistently — most evidence-backed supplement for strength.</p>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- SUMMARY MODAL -->
+<div class="modal-overlay hidden" id="summary-modal">
+  <div class="modal">
+    <div class="modal-hdr">
+      <div>
+        <div class="modal-title">&#127881; Workout Complete!</div>
+        <div class="modal-sub" id="sum-subtitle"></div>
+      </div>
+      <button class="modal-close" onclick="closeSummary()">&#10005;</button>
+    </div>
+    <div class="modal-body" id="summary-content"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost btn-sm" onclick="switchTab('history');closeSummary()">View History</button>
+      <button class="btn btn-primary" onclick="closeSummary()">Done</button>
     </div>
   </div>
 </div>
@@ -869,18 +929,132 @@ function switchTab(tab) {
 function onDateChange(val) { currentDate = val; }
 
 // ═══════════════════════════════════════════
+//  SUMMARY
+// ═══════════════════════════════════════════
+function getElapsedMs(day) {
+  if (wtStart[day]) return (wtPaused[day] && !wtTimers[day]) ? wtPaused[day] : Date.now() - wtStart[day];
+  return wtPaused[day] || 0;
+}
+
+function buildSummary(day) {
+  let totalSets = 0, doneSets = 0, totalVolume = 0;
+  const exerciseSummaries = [];
+  WK[day].exercises.forEach(ex => {
+    const d    = getExData(day, ex.id);
+    const done = d.sets.filter(s => s.done).length;
+    const vol  = ex.timed ? 0 : d.sets.filter(s => s.done)
+      .reduce((acc, s) => acc + (parseFloat(s.w)||0) * (parseFloat(s.r)||0), 0);
+    totalSets   += ex.sets;
+    doneSets    += done;
+    totalVolume += vol;
+    if (done > 0 || d.sets.some(s => s.w || s.r)) {
+      const weights = d.sets.filter(s => s.w).map(s => parseFloat(s.w));
+      exerciseSummaries.push({
+        name: ex.name, doneSets: done, totalSets: ex.sets,
+        volume: Math.round(vol),
+        maxWeight: weights.length ? Math.max(...weights) : 0
+      });
+    }
+  });
+  const activitiesDone = Object.entries(session[day].activities || {})
+    .filter(([,v]) => v).map(([k]) => ACTIVITIES[k]?.name).filter(Boolean);
+  return { totalSets, doneSets, totalVolume: Math.round(totalVolume),
+           exerciseSummaries, activitiesDone, duration_ms: getElapsedMs(day) };
+}
+
+function showSummary(day) {
+  const s     = buildSummary(day);
+  const label = {A:'Day A · Upper Body', B:'Day B · Lower Body', C:'Day C · Full Body'}[day] || day;
+  const pct   = s.totalSets ? Math.round(s.doneSets / s.totalSets * 100) : 0;
+  document.getElementById('sum-subtitle').textContent = `${label}  —  ${fmtDate(currentDate)}`;
+
+  const exRows = s.exerciseSummaries.map(ex => {
+    const p      = ex.totalSets ? Math.round(ex.doneSets / ex.totalSets * 100) : 0;
+    const volTxt = ex.volume > 0 ? `${ex.volume.toLocaleString()} kg`
+                 : ex.maxWeight > 0 ? `max ${ex.maxWeight} kg` : '';
+    return `<div class="sum-ex-row">
+      <div class="sum-ex-name">${ex.name}</div>
+      ${volTxt ? `<div class="sum-ex-vol">${volTxt}</div>` : ''}
+      <div class="sum-ex-prog">
+        <div class="sum-bar-bg"><div class="sum-bar-fill" style="width:${p}%"></div></div>
+        <div class="sum-sets">${ex.doneSets}/${ex.totalSets}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const actSection = s.activitiesDone.length ? `
+    <div style="margin-top:18px;">
+      <div class="sum-sec-hdr">Activities Completed</div>
+      <div class="sum-acts">${s.activitiesDone.map(a => `<span class="sum-act-pill">&#10003; ${a}</span>`).join('')}</div>
+    </div>` : '';
+
+  document.getElementById('summary-content').innerHTML = `
+    <div class="sum-stats">
+      <div class="sum-stat">
+        <div class="sum-stat-val yellow">${s.duration_ms > 0 ? fmtElapsed(s.duration_ms) : '—'}</div>
+        <div class="sum-stat-lbl">Duration</div>
+      </div>
+      <div class="sum-stat">
+        <div class="sum-stat-val green">${pct}%</div>
+        <div class="sum-stat-lbl">Completion</div>
+      </div>
+      <div class="sum-stat">
+        <div class="sum-stat-val">${s.totalVolume > 0 ? s.totalVolume.toLocaleString() + ' kg' : s.doneSets + ' sets'}</div>
+        <div class="sum-stat-lbl">${s.totalVolume > 0 ? 'Total Volume' : 'Sets Done'}</div>
+      </div>
+    </div>
+    <div class="sum-sec-hdr">Exercise Breakdown</div>
+    <div>${exRows || '<div style="color:var(--muted);font-size:.85rem;">No exercises logged</div>'}</div>
+    ${actSection}`;
+
+  document.getElementById('summary-modal').classList.remove('hidden');
+}
+function closeSummary() { document.getElementById('summary-modal').classList.add('hidden'); }
+
+function finishWorkout(day) {
+  // Pause the workout timer
+  if (wtTimers[day]) {
+    clearInterval(wtTimers[day]); wtTimers[day] = null;
+    wtPaused[day] = Date.now() - wtStart[day];
+    const btn = document.getElementById('wt-btn-' + day);
+    if (btn) btn.innerHTML = '&#9654; Resume';
+  }
+  // Build & save
+  const summary = buildSummary(day);
+  const hasData = Object.values(session[day].exercises).some(ex => ex.sets.some(s => s.w||s.r||s.done)||ex.note)
+    || Object.values(session[day].activities).some(Boolean);
+  if (hasData) {
+    const idx = history.findIndex(h => h.date === currentDate && h.day === day);
+    if (idx >= 0) history.splice(idx, 1);
+    history.push({ date:currentDate, day,
+      exercises:  JSON.parse(JSON.stringify(session[day].exercises)),
+      activities: JSON.parse(JSON.stringify(session[day].activities)),
+      meta: summary });
+    persistHistory(); persistSession(); setStatus('saved'); renderHistory();
+  }
+  showSummary(day);
+}
+
+// ═══════════════════════════════════════════
 //  SAVE
 // ═══════════════════════════════════════════
 function saveWorkout() {
+  let savedAny = false;
   ['A','B','C'].forEach(day => {
     const hasData = Object.values(session[day].exercises).some(ex => ex.sets.some(s => s.w||s.r||s.done)||ex.note)
       || Object.values(session[day].activities).some(Boolean);
     if (!hasData) return;
+    const summary = buildSummary(day);
     const idx = history.findIndex(h => h.date === currentDate && h.day === day);
     if (idx >= 0) history.splice(idx, 1);
-    history.push({ date:currentDate, day, exercises:JSON.parse(JSON.stringify(session[day].exercises)), activities:JSON.parse(JSON.stringify(session[day].activities)) });
+    history.push({ date:currentDate, day,
+      exercises:  JSON.parse(JSON.stringify(session[day].exercises)),
+      activities: JSON.parse(JSON.stringify(session[day].activities)),
+      meta: summary });
+    savedAny = true;
   });
   persistHistory(); setStatus('saved'); renderHistory();
+  if (savedAny) showSummary(currentTab);
 }
 function scheduleAutoSave() {
   clearTimeout(saveTimer); setStatus('pending');
@@ -919,7 +1093,18 @@ function renderHistory() {
       if (!done && !detail) return '';
       return `<div class="h-row"><div class="h-exname">${ex.name}</div><div class="h-exsets">${done}/${ex.sets} sets${detail?' &middot; '+detail:''}</div></div>`;
     }).filter(Boolean).join('');
-    return `<div class="h-entry"><div class="h-head"><div class="h-date">${fmtDate(entry.date)}</div><div class="h-badge">${label}</div></div><div class="h-body">${rows||'<div style="color:var(--muted);font-size:.81rem;">No data recorded</div>'}</div></div>`;
+    const m = entry.meta;
+    const metaStrip = m ? `<div class="h-meta">
+      ${m.duration_ms > 0 ? `<span class="h-meta-pill">&#9201; ${fmtElapsed(m.duration_ms)}</span>` : ''}
+      <span class="h-meta-pill">&#9989; ${m.doneSets}/${m.totalSets} sets · ${m.totalSets ? Math.round(m.doneSets/m.totalSets*100) : 0}%</span>
+      ${m.totalVolume > 0 ? `<span class="h-meta-pill">&#128170; ${m.totalVolume.toLocaleString()} kg volume</span>` : ''}
+      ${m.activitiesDone?.length ? `<span class="h-meta-pill">&#127939; ${m.activitiesDone.join(' · ')}</span>` : ''}
+    </div>` : '';
+    return `<div class="h-entry">
+      <div class="h-head"><div class="h-date">${fmtDate(entry.date)}</div><div class="h-badge">${label}</div></div>
+      ${metaStrip}
+      <div class="h-body">${rows||'<div style="color:var(--muted);font-size:.81rem;">No data recorded</div>'}</div>
+    </div>`;
   }).join('');
 }
 
