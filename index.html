@@ -132,17 +132,17 @@
     .sets-wrap { padding: 0 14px 12px; }
     .sets-cols {
       display: grid;
-      grid-template-columns: 26px minmax(60px,1fr) 82px 68px 32px;
+      grid-template-columns: 52px minmax(60px,1fr) 82px 68px 32px;
       gap: 5px;
       font-size: .7rem; text-transform: uppercase; letter-spacing: .05em;
       color: var(--muted); margin-bottom: 6px; padding: 0 2px;
     }
     .set-row {
       display: grid;
-      grid-template-columns: 26px minmax(60px,1fr) 82px 68px 32px;
+      grid-template-columns: 52px minmax(60px,1fr) 82px 68px 32px;
       gap: 5px; align-items: center; margin-bottom: 5px;
     }
-    .set-num  { font-size: .77rem; color: var(--muted); text-align: center; }
+    .set-num  { font-size: .72rem; color: var(--muted); text-align: center; font-weight: 600; }
     .set-prev { font-size: .76rem; color: var(--muted); font-style: italic; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .set-input {
       background: var(--input); border: 1px solid var(--border);
@@ -237,8 +237,19 @@
     .sv-status.ok  { color: var(--green); }
     .sv-status.pnd { color: var(--yellow); }
 
+    /* ── DEMO LINK ── */
+    .demo-link {
+      font-size: .7rem; color: var(--accent-l); text-decoration: none;
+      display: inline-flex; align-items: center; gap: 3px;
+      padding: 2px 8px; border-radius: 20px;
+      background: rgba(99,102,241,.1); border: 1px solid rgba(99,102,241,.2);
+      transition: all .15s; margin-left: 6px; vertical-align: middle;
+      font-weight: 500;
+    }
+    .demo-link:hover { background: rgba(99,102,241,.25); color: #fff; }
+
     @media (max-width: 480px) {
-      .sets-cols, .set-row { grid-template-columns: 22px minmax(50px,1fr) 70px 58px 28px; gap: 4px; }
+      .sets-cols, .set-row { grid-template-columns: 44px minmax(50px,1fr) 70px 58px 28px; gap: 4px; }
       .hdr-row2 { gap: 6px; }
     }
     .hidden { display: none !important; }
@@ -553,8 +564,9 @@ function buildCard(ex, day) {
   if (ex.light)     tags += `<span class="tag t-light">&#9889; Light load</span>`;
   if (ex.timed)     tags += `<span class="tag t-timed">&#9201; Timed</span>`;
 
-  const wLbl = ex.timed ? 'sec' : 'kg';
-  const rLbl = ex.reps.split('–')[0];
+  const wLbl    = ex.timed ? 'sec' : 'kg';
+  const rLbl    = ex.reps.split('–')[0];
+  const demoUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(ex.name + ' exercise proper form')}`;
 
   let rows = '';
   for (let i = 0; i < ex.sets; i++) {
@@ -572,7 +584,7 @@ function buildCard(ex, day) {
 
     rows += `
       <div class="set-row" id="${ex.id}_r${i}">
-        <div class="set-num">${i+1}</div>
+        <div class="set-num">Set ${i+1}</div>
         <div class="set-prev" title="${prevTxt}">${prevTxt}</div>
         <input type="number" class="set-input${wFil}" placeholder="${wLbl}" value="${set.w}" min="0" step="0.5"
                oninput="onInput('${day}','${ex.id}',${i},'w',this.value,this)">
@@ -586,7 +598,7 @@ function buildCard(ex, day) {
     <div class="${cardCls}" id="card_${ex.id}">
       <div class="ex-hdr">
         <div class="ex-name-grp">
-          <div class="ex-name">${ex.name}</div>
+          <div class="ex-name">${ex.name}<a href="${demoUrl}" target="_blank" rel="noopener" class="demo-link">&#9654; Demo</a></div>
           <div class="tag-row">${tags}</div>
         </div>
         <div class="ex-right">
