@@ -83,7 +83,8 @@
       border-radius: var(--r); margin-bottom: 11px; overflow: hidden; transition: border-color .2s, opacity .35s;
       box-shadow: 0 2px 10px rgba(99,102,241,.07), 0 1px 3px rgba(0,0,0,.06); }
     .ex-card.partial  { border-color: rgba(99,102,241,.55); }
-    .ex-card.all-done { border-color: var(--green); opacity: .42; }
+    .ex-card.all-done { border-color: var(--green); }
+    .ex-card.all-done:not(.inactive) { opacity: 0.72; }
     .ex-hdr { display: flex; justify-content: space-between; align-items: flex-start; padding: 12px 14px 10px; gap: 8px; }
     .ex-name-grp { flex: 1; }
     .ex-name { font-weight: 600; font-size: .96rem; margin-bottom: 5px; }
@@ -268,12 +269,19 @@
     /* Finish button */
     .finish-btn { width: 100%; justify-content: center; padding: 13px !important; margin-top: 6px;
       font-size: .95rem !important; letter-spacing: .01em; }
-    /* Active / inactive exercise state */
+    /* Active / inactive exercise state — inactive cards collapse to header only */
     .ex-card.inactive, .act-card.inactive {
-      opacity: 0.22; cursor: pointer; transition: opacity .3s;
+      opacity: 0.58; cursor: pointer; transition: opacity .3s;
     }
-    .ex-card.inactive:hover, .act-card.inactive:hover { opacity: 0.42; }
-    .ex-card.inactive .sets-wrap, .act-card.inactive .act-body { pointer-events: none; }
+    .ex-card.inactive:hover, .act-card.inactive:hover { opacity: 0.85; }
+    .ex-card.inactive .sets-wrap, .act-card.inactive .act-body { display: none; }
+
+    /* Add-set button */
+    .add-set-btn { display: inline-flex; align-items: center; gap: 5px; margin-top: 10px;
+      padding: 6px 14px; border-radius: 8px; border: 1px dashed var(--border);
+      background: transparent; color: var(--muted); cursor: pointer; font-size: .8rem;
+      font-weight: 500; transition: all .15s; }
+    .add-set-btn:hover { border-color: var(--accent); color: var(--accent-l); background: rgba(99,102,241,.06); }
 
     .hidden { display: none !important; }
 
@@ -648,22 +656,16 @@ function setActiveExercise(day, id) {
 
 function refreshActiveStates(day) {
   const order = [
-    { id:'warmup',   cardId:`card_warmup_${day}`,   isDone:() => !!(session[day].activities?.warmup)   },
-    ...WK[day].exercises.map(ex => ({
-      id: ex.id, cardId:`card_${ex.id}`,
-      isDone: () => getExData(day, ex.id).sets.every(s => s.done)
-    })),
-    { id:'cooldown', cardId:`card_cooldown_${day}`, isDone:() => !!(session[day].activities?.cooldown) },
+    { id:'warmup',   cardId:`card_warmup_${day}`   },
+    ...WK[day].exercises.map(ex => ({ id: ex.id, cardId:`card_${ex.id}` })),
+    { id:'cooldown', cardId:`card_cooldown_${day}` },
   ];
   const active = activeEx[day];
-  order.forEach(({ id, cardId, isDone }) => {
+  order.forEach(({ id, cardId }) => {
     const el = document.getElementById(cardId);
     if (!el) return;
-    if (isDone() || !active || id === active) {
-      el.classList.remove('inactive');
-    } else {
-      el.classList.add('inactive');
-    }
+    if (id === active) el.classList.remove('inactive');
+    else               el.classList.add('inactive');
   });
 }
 
@@ -921,27 +923,13 @@ function buildActivityCard(actKey, day) {
     </div>`;
 }
 
-function buildCard(ex, day) {
-  const data    = getExData(day, ex.id);
-  const doneCnt = data.sets.filter(s => s.done).length;
-  const allDone = doneCnt === ex.sets;
-  const partial = doneCnt > 0 && !allDone;
-  const cardCls = allDone ? 'ex-card all-done' : partial ? 'ex-card partial' : 'ex-card';
-  const dotCls  = allDone ? 'done-dot green'   : partial ? 'done-dot blue'   : 'done-dot';
-  const demoUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(ex.name + ' exercise proper form')}`;
-
-  let tags = `<span class="tag t-muscle">${ex.muscle}</span>`;
-  if (ex.gluteSafe) tags += `<span class="tag t-safe">&#10003; Glute-safe</span>`;
-  if (ex.light)     tags += `<span class="tag t-light">&#9889; Light load</span>`;
-  if (ex.timed)     tags += `<span class="tag t-timed">&#9201; Timed</span>`;
-
+function buildSetRows(ex, data, day) {
   let rows = '';
-  for (let i = 0; i < ex.sets; i++) {
+  for (let i = 0; i < data.sets.length; i++) {
     const set  = data.sets[i] || {w:'', r:'', done:false};
     const prev = getPrevSet(day, ex.id, i);
     let prevTxt = '—';
     if (prev) prevTxt = ex.timed ? (prev.r ? `${prev.r}s` : '—') : (prev.w && prev.r ? `${prev.w}×${prev.r}` : prev.w ? `${prev.w}kg` : '—');
-
     const wFil     = set.w ? ' filled' : '';
     const rFil     = set.r ? ' filled' : '';
     const rowCls   = set.done ? ' set-done' : '';
@@ -949,7 +937,6 @@ function buildCard(ex, day) {
     const chkCls   = set.done ? 'chk done' : 'chk';
     const wPh      = ex.timed ? 'secs' : '0 kg';
     const rPh      = ex.timed ? 'hold' : 'reps';
-
     rows += `
       <div class="set-row${rowCls}" id="${ex.id}_r${i}">
         <div class="set-num">Set ${i+1}</div>
@@ -963,16 +950,35 @@ function buildCard(ex, day) {
         <div class="${chkCls}" onclick="toggleDone('${day}','${ex.id}',${i})">${set.done ? '&#10003;' : ''}</div>
       </div>`;
   }
+  return rows;
+}
+
+function buildCard(ex, day) {
+  const data    = getExData(day, ex.id);
+  const doneCnt = data.sets.filter(s => s.done).length;
+  const allDone = doneCnt === data.sets.length && data.sets.length > 0;
+  const partial = doneCnt > 0 && !allDone;
+  const cardCls = allDone ? 'ex-card all-done' : partial ? 'ex-card partial' : 'ex-card';
+  const dotCls  = allDone ? 'done-dot green'   : partial ? 'done-dot blue'   : 'done-dot';
+  const demoUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(ex.name + ' exercise proper form')}`;
+
+  let tags = `<span class="tag t-muscle">${ex.muscle}</span>`;
+  if (ex.gluteSafe) tags += `<span class="tag t-safe">&#10003; Glute-safe</span>`;
+  if (ex.light)     tags += `<span class="tag t-light">&#9889; Light load</span>`;
+  if (ex.timed)     tags += `<span class="tag t-timed">&#9201; Timed</span>`;
+
+  const setCount = data.sets.length;
+  const setLabel = doneCnt > 0 ? `${doneCnt}/${setCount}` : `${setCount} sets`;
 
   return `
-    <div class="${cardCls}" id="card_${ex.id}" onclick="setActiveExercise('${day}','${ex.id}')">
+    <div class="${cardCls} inactive" id="card_${ex.id}" onclick="setActiveExercise('${day}','${ex.id}')">
       <div class="ex-hdr">
         <div class="ex-name-grp">
-          <div class="ex-name">${ex.name}<a href="${demoUrl}" target="_blank" rel="noopener" class="demo-link">&#9654; Demo</a></div>
+          <div class="ex-name">${ex.name}<a href="${demoUrl}" target="_blank" rel="noopener" class="demo-link" onclick="event.stopPropagation()">&#9654; Demo</a></div>
           <div class="tag-row">${tags}</div>
         </div>
         <div class="ex-right">
-          <div class="ex-target">${ex.sets} &times; ${ex.reps}</div>
+          <div class="ex-target">${ex.reps} · <span id="setcount_${ex.id}">${setLabel}</span></div>
           <div class="ex-rest">rest ${ex.rest} s</div>
           <div class="ex-timer${allDone ? ' frozen' : ''}" id="ext_${day}_${ex.id}">${data.timeMs > 0 ? fmtMinSec(data.timeMs) : '00:00'}</div>
           <div class="${dotCls}" id="dot_${ex.id}"></div>
@@ -980,7 +986,8 @@ function buildCard(ex, day) {
       </div>
       <div class="sets-wrap">
         <div class="sets-cols"><div></div><div>Previous</div><div>${ex.timed ? 'Secs' : 'Weight'}</div><div>Reps</div><div></div></div>
-        ${rows}
+        <div id="setsrows_${ex.id}">${buildSetRows(ex, data, day)}</div>
+        <button class="add-set-btn" onclick="event.stopPropagation();addSet('${day}','${ex.id}')">&#43; Add Set</button>
         <textarea class="note-area" placeholder="Notes for this exercise..."
                   oninput="onNote('${day}','${ex.id}',this.value)">${data.note||''}</textarea>
       </div>
@@ -1030,15 +1037,30 @@ function toggleDone(day, exId, idx) {
 }
 
 function refreshCardState(day, exId) {
-  const ex      = WK[day].exercises.find(e => e.id === exId);
   const d       = getExData(day, exId);
   const doneCnt = d.sets.filter(s => s.done).length;
-  const allDone = doneCnt === ex.sets;
+  const total   = d.sets.length;
+  const allDone = doneCnt === total && total > 0;
   const partial = doneCnt > 0 && !allDone;
   const card    = document.getElementById(`card_${exId}`);
   const dot     = document.getElementById(`dot_${exId}`);
-  if (card) card.className = allDone ? 'ex-card all-done' : partial ? 'ex-card partial' : 'ex-card';
-  if (dot)  dot.className  = allDone ? 'done-dot green'   : partial ? 'done-dot blue'   : 'done-dot';
+  const lbl     = document.getElementById(`setcount_${exId}`);
+  const isInact = card?.classList.contains('inactive');
+  if (card) card.className = (allDone ? 'ex-card all-done' : partial ? 'ex-card partial' : 'ex-card') + (isInact ? ' inactive' : '');
+  if (dot)  dot.className  = allDone ? 'done-dot green' : partial ? 'done-dot blue' : 'done-dot';
+  if (lbl)  lbl.textContent = doneCnt > 0 ? `${doneCnt}/${total}` : `${total} sets`;
+}
+
+function addSet(day, exId) {
+  setActiveExercise(day, exId);
+  const d  = getExData(day, exId);
+  const ex = WK[day].exercises.find(e => e.id === exId);
+  d.sets.push({w:'', r:'', done:false});
+  const container = document.getElementById(`setsrows_${exId}`);
+  if (container) container.innerHTML = buildSetRows(ex, d, day);
+  refreshCardState(day, exId);
+  updateProgress(day);
+  scheduleAutoSave();
 }
 
 // ═══════════════════════════════════════════
@@ -1048,7 +1070,7 @@ function updateProgress(day) {
   let total = 0, done = 0;
   WK[day].exercises.forEach(ex => {
     const d = getExData(day, ex.id);
-    total += ex.sets; done += d.sets.filter(s => s.done).length;
+    total += d.sets.length; done += d.sets.filter(s => s.done).length;
   });
   const pct  = total ? Math.round(done/total*100) : 0;
   const fill = document.getElementById('prog-' + day);
@@ -1090,7 +1112,7 @@ function buildSummary(day) {
     const done = d.sets.filter(s => s.done).length;
     const vol  = ex.timed ? 0 : d.sets.filter(s => s.done)
       .reduce((acc, s) => acc + (parseFloat(s.w)||0) * (parseFloat(s.r)||0), 0);
-    totalSets   += ex.sets;
+    totalSets   += d.sets.length;
     doneSets    += done;
     totalVolume += vol;
     if (done > 0 || d.sets.some(s => s.w || s.r)) {
