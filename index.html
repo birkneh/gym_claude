@@ -6,11 +6,11 @@
   <title>Gym Tracker</title>
   <style>
     :root {
-      --bg: #0d0f1a; --card: #161928; --card2: #1c2038;
-      --accent: #6366f1; --accent-l: #818cf8;
-      --green: #22c55e; --yellow: #eab308; --red: #ef4444;
-      --text: #e2e8f0; --muted: #94a3b8;
-      --border: #252a44; --input: #1a1e30; --r: 11px;
+      --bg: #eef0f8; --card: #ffffff; --card2: #f3f4fb;
+      --accent: #6366f1; --accent-l: #4f46e5;
+      --green: #16a34a; --yellow: #d97706; --red: #dc2626;
+      --text: #1e1f3b; --muted: #64748b;
+      --border: #dde1ef; --input: #f5f6ff; --r: 11px;
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -69,14 +69,14 @@
     .prog-lbl  { font-size: .78rem; color: var(--muted); white-space: nowrap; min-width: 130px; text-align: right; }
 
     /* ── INFO / WARNING BOXES ── */
-    .info-box { background: rgba(99,102,241,.07); border: 1px solid rgba(99,102,241,.22);
+    .info-box { background: rgba(99,102,241,.08); border: 1px solid rgba(99,102,241,.25);
       border-radius: var(--r); padding: 11px 13px;
       font-size: .81rem; color: var(--muted); line-height: 1.65; margin-bottom: 14px; }
     .info-box strong { color: var(--accent-l); }
-    .warn-box { background: rgba(239,68,68,.07); border: 1px solid rgba(239,68,68,.22);
+    .warn-box { background: rgba(220,38,38,.07); border: 1px solid rgba(220,38,38,.25);
       border-radius: var(--r); padding: 11px 13px;
-      font-size: .81rem; color: #fca5a5; line-height: 1.65; margin-bottom: 14px; }
-    .warn-box strong { color: #fca5a5; }
+      font-size: .81rem; color: #b91c1c; line-height: 1.65; margin-bottom: 14px; }
+    .warn-box strong { color: #b91c1c; }
 
     /* ── EXERCISE CARD ── */
     .ex-card { background: var(--card); border: 1px solid var(--border);
@@ -163,7 +163,7 @@
     .rest-widget { position: fixed; bottom: 80px; right: 16px; z-index: 400;
       background: var(--card2); border: 1px solid var(--border); border-radius: var(--r);
       padding: 13px 16px 13px 14px; display: flex; align-items: center; gap: 14px;
-      box-shadow: 0 6px 24px rgba(0,0,0,.5); transition: opacity .25s; }
+      box-shadow: 0 6px 24px rgba(0,0,0,.12); transition: opacity .25s; }
     .rest-widget.hidden { display: none; }
     .rest-lbl { font-size: .68rem; text-transform: uppercase; letter-spacing: .06em;
       color: var(--muted); margin-bottom: 2px; }
@@ -233,7 +233,7 @@
       display: flex; align-items: center; justify-content: center; padding: 16px; }
     .modal { background: var(--card); border: 1px solid var(--border); border-radius: 14px;
       width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto;
-      box-shadow: 0 20px 60px rgba(0,0,0,.6); }
+      box-shadow: 0 8px 40px rgba(0,0,0,.14); }
     .modal-hdr { display: flex; justify-content: space-between; align-items: flex-start;
       padding: 18px 20px 14px; border-bottom: 1px solid var(--border); }
     .modal-title { font-size: 1.15rem; font-weight: 800; }
