@@ -266,6 +266,12 @@
     /* Finish button */
     .finish-btn { width: 100%; justify-content: center; padding: 13px !important; margin-top: 6px;
       font-size: .95rem !important; letter-spacing: .01em; }
+    /* Active / inactive exercise state */
+    .ex-card.inactive, .act-card.inactive {
+      opacity: 0.22; cursor: pointer; transition: opacity .3s;
+    }
+    .ex-card.inactive:hover, .act-card.inactive:hover { opacity: 0.42; }
+    .ex-card.inactive .sets-wrap, .act-card.inactive .act-body { pointer-events: none; }
 
     .hidden { display: none !important; }
   </style>
@@ -553,6 +559,59 @@ let lastRestSecs = 90;
 // Activity timers
 let actTimers = {};   // { 'warmup_A': { iv: intervalId, rem: seconds } }
 
+// Active exercise tracking (one per day)
+let activeEx = {};    // { A: 'A1' | 'warmup' | 'cooldown' | null }
+
+// ═══════════════════════════════════════════
+//  ACTIVE EXERCISE
+// ═══════════════════════════════════════════
+function setActiveExercise(day, id) {
+  if (activeEx[day] === id) return;
+  activeEx[day] = id;
+  refreshActiveStates(day);
+}
+
+function refreshActiveStates(day) {
+  const order = [
+    { id:'warmup',   cardId:`card_warmup_${day}`,   isDone:() => !!(session[day].activities?.warmup)   },
+    ...WK[day].exercises.map(ex => ({
+      id: ex.id, cardId:`card_${ex.id}`,
+      isDone: () => getExData(day, ex.id).sets.every(s => s.done)
+    })),
+    { id:'cooldown', cardId:`card_cooldown_${day}`, isDone:() => !!(session[day].activities?.cooldown) },
+  ];
+  const active = activeEx[day];
+  order.forEach(({ id, cardId, isDone }) => {
+    const el = document.getElementById(cardId);
+    if (!el) return;
+    if (isDone() || !active || id === active) {
+      el.classList.remove('inactive');
+    } else {
+      el.classList.add('inactive');
+    }
+  });
+}
+
+function autoAdvance(day, currentId) {
+  const order = ['warmup', ...WK[day].exercises.map(e => e.id), 'cooldown'];
+  const idx = order.indexOf(currentId);
+  if (idx < 0) return;
+  for (let i = idx + 1; i < order.length; i++) {
+    const nextId = order[i];
+    const isAct  = nextId === 'warmup' || nextId === 'cooldown';
+    const done   = isAct ? !!(session[day].activities?.[nextId])
+                         : getExData(day, nextId).sets.every(s => s.done);
+    if (!done) {
+      setActiveExercise(day, nextId);
+      // Smooth scroll to the next card
+      const cardId = isAct ? `card_${nextId}_${day}` : `card_${nextId}`;
+      setTimeout(() => document.getElementById(cardId)
+        ?.scrollIntoView({ behavior:'smooth', block:'center' }), 320);
+      return;
+    }
+  }
+}
+
 // ═══════════════════════════════════════════
 //  HELPERS
 // ═══════════════════════════════════════════
@@ -674,6 +733,7 @@ function updateRestDisplay() {
 //  ACTIVITY TIMER (warmup / cooldown)
 // ═══════════════════════════════════════════
 function toggleActivityTimer(actKey, day, totalSecs) {
+  setActiveExercise(day, actKey);
   const k   = `${actKey}_${day}`;
   const btn = document.getElementById(`act_btn_${actKey}_${day}`);
   if (!actTimers[k]) actTimers[k] = { iv:null, rem: totalSecs };
@@ -718,6 +778,7 @@ function updateActDisplay(actKey, day, override) {
   if (el) el.textContent = fmtCountdown(Math.max(rem,0));
 }
 function toggleActivityDone(actKey, day) {
+  setActiveExercise(day, actKey);
   session[day].activities[actKey] = !session[day].activities[actKey];
   const isDone = session[day].activities[actKey];
   const card   = document.getElementById(`card_${actKey}_${day}`);
@@ -726,6 +787,7 @@ function toggleActivityDone(actKey, day) {
   if (card) card.className = isDone ? 'act-card act-done' : 'act-card';
   if (dot)  dot.className  = isDone ? 'done-dot green' : 'done-dot';
   if (btn)  { btn.className = isDone ? 'act-done-btn done' : 'act-done-btn'; btn.innerHTML = isDone ? '&#10003; Completed' : '&#9711; Mark as Done'; }
+  if (isDone) autoAdvance(day, actKey);
   scheduleAutoSave();
 }
 
@@ -740,6 +802,7 @@ function renderAllDays() {
     el.innerHTML = buildActivityCard('warmup', d)
       + WK[d].exercises.map(ex => buildCard(ex, d)).join('')
       + buildActivityCard('cooldown', d);
+    refreshActiveStates(d);
   });
 }
 
@@ -750,7 +813,7 @@ function buildActivityCard(actKey, day) {
   const rem    = actTimers[k]?.rem ?? act.duration;
 
   return `
-    <div class="act-card ${isDone ? 'act-done' : ''}" id="card_${actKey}_${day}">
+    <div class="act-card ${isDone ? 'act-done' : ''}" id="card_${actKey}_${day}" onclick="setActiveExercise('${day}','${actKey}')">
       <div class="ex-hdr">
         <div class="ex-name-grp">
           <div class="ex-name">${act.icon} ${act.name}</div>
@@ -827,7 +890,7 @@ function buildCard(ex, day) {
   }
 
   return `
-    <div class="${cardCls}" id="card_${ex.id}">
+    <div class="${cardCls}" id="card_${ex.id}" onclick="setActiveExercise('${day}','${ex.id}')">
       <div class="ex-hdr">
         <div class="ex-name-grp">
           <div class="ex-name">${ex.name}<a href="${demoUrl}" target="_blank" rel="noopener" class="demo-link">&#9654; Demo</a></div>
@@ -852,6 +915,7 @@ function buildCard(ex, day) {
 //  INPUT / TOGGLE HANDLERS
 // ═══════════════════════════════════════════
 function onInput(day, exId, idx, field, value, el) {
+  setActiveExercise(day, exId);
   getExData(day, exId).sets[idx][field] = value;
   el.classList.toggle('filled', !!value);
   updateProgress(day);
@@ -860,6 +924,7 @@ function onInput(day, exId, idx, field, value, el) {
 function onNote(day, exId, value) { getExData(day, exId).note = value; scheduleAutoSave(); }
 
 function toggleDone(day, exId, idx) {
+  setActiveExercise(day, exId);
   const d   = getExData(day, exId);
   d.sets[idx].done = !d.sets[idx].done;
   const done = d.sets[idx].done;
@@ -881,6 +946,8 @@ function toggleDone(day, exId, idx) {
   refreshCardState(day, exId);
   updateProgress(day);
   scheduleAutoSave();
+  // Auto-advance when all sets of this exercise are done
+  if (d.sets.every(s => s.done)) autoAdvance(day, exId);
 }
 
 function refreshCardState(day, exId) {
