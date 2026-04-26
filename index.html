@@ -80,7 +80,8 @@
 
     /* ── EXERCISE CARD ── */
     .ex-card { background: var(--card); border: 1px solid var(--border);
-      border-radius: var(--r); margin-bottom: 11px; overflow: hidden; transition: border-color .2s, opacity .35s; }
+      border-radius: var(--r); margin-bottom: 11px; overflow: hidden; transition: border-color .2s, opacity .35s;
+      box-shadow: 0 2px 10px rgba(99,102,241,.07), 0 1px 3px rgba(0,0,0,.06); }
     .ex-card.partial  { border-color: rgba(99,102,241,.55); }
     .ex-card.all-done { border-color: var(--green); opacity: .42; }
     .ex-hdr { display: flex; justify-content: space-between; align-items: flex-start; padding: 12px 14px 10px; gap: 8px; }
@@ -143,7 +144,8 @@
 
     /* ── ACTIVITY CARD (cardio / stretch) ── */
     .act-card { background: var(--card); border: 1px solid rgba(99,102,241,.3);
-      border-radius: var(--r); margin-bottom: 11px; overflow: hidden; transition: border-color .2s, opacity .35s; }
+      border-radius: var(--r); margin-bottom: 11px; overflow: hidden; transition: border-color .2s, opacity .35s;
+      box-shadow: 0 2px 10px rgba(99,102,241,.07), 0 1px 3px rgba(0,0,0,.06); }
     .act-card.act-done { border-color: var(--green); opacity: .44; }
     .act-body { padding: 0 14px 14px; }
     .act-timer-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
@@ -274,6 +276,19 @@
     .ex-card.inactive .sets-wrap, .act-card.inactive .act-body { pointer-events: none; }
 
     .hidden { display: none !important; }
+
+    /* ── SHADOWS ── */
+    .wt-bar  { box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+    .g-card  { box-shadow: 0 2px 10px rgba(99,102,241,.07), 0 1px 3px rgba(0,0,0,.06); }
+    .h-entry { box-shadow: 0 2px 8px rgba(0,0,0,.05); }
+
+    /* ── PER-EXERCISE TIMER ── */
+    .ex-timer { font-size: .74rem; font-variant-numeric: tabular-nums; font-weight: 700;
+      color: var(--muted); letter-spacing: .04em; padding: 2px 6px;
+      border-radius: 5px; background: var(--card2); border: 1px solid var(--border);
+      transition: color .25s, background .25s; white-space: nowrap; }
+    .ex-timer.running { color: var(--green); border-color: rgba(34,197,94,.35); background: rgba(34,197,94,.07); }
+    .ex-timer.frozen  { color: var(--accent-l); border-color: rgba(99,102,241,.3); background: rgba(99,102,241,.06); }
   </style>
 </head>
 <body>
@@ -560,15 +575,75 @@ let lastRestSecs = 90;
 let actTimers = {};   // { 'warmup_A': { iv: intervalId, rem: seconds } }
 
 // Active exercise tracking (one per day)
-let activeEx = {};    // { A: 'A1' | 'warmup' | 'cooldown' | null }
+let activeEx  = {};    // { A: 'A1' | 'warmup' | 'cooldown' | null }
+
+// Per-exercise elapsed timers
+let exTimers  = {};    // { 'A_A1': { iv: intervalId|null, elapsed: ms, frozen: bool } }
+
+// ═══════════════════════════════════════════
+//  PER-EXERCISE TIMER
+// ═══════════════════════════════════════════
+function fmtMinSec(ms) {
+  const s = Math.floor(ms / 1000);
+  return `${pad(Math.floor(s / 60))}:${pad(s % 60)}`;
+}
+function getExTimer(day, exId) {
+  const key = `${day}_${exId}`;
+  if (!exTimers[key]) exTimers[key] = { iv: null, elapsed: 0, frozen: false };
+  return exTimers[key];
+}
+function startExTimer(day, exId) {
+  const key = `${day}_${exId}`;
+  const t = getExTimer(day, exId);
+  if (t.frozen || t.iv) return;
+  const startAt = Date.now() - t.elapsed;
+  t.iv = setInterval(() => {
+    t.elapsed = Date.now() - startAt;
+    updateExTimerDisplay(day, exId);
+  }, 500);
+  const el = document.getElementById(`ext_${day}_${exId}`);
+  if (el) { el.classList.add('running'); el.classList.remove('frozen'); }
+}
+function pauseExTimer(day, exId) {
+  const key = `${day}_${exId}`;
+  const t = exTimers[key];
+  if (!t || !t.iv) return;
+  clearInterval(t.iv); t.iv = null;
+  getExData(day, exId).timeMs = t.elapsed;
+  const el = document.getElementById(`ext_${day}_${exId}`);
+  if (el) el.classList.remove('running');
+}
+function freezeExTimer(day, exId) {
+  const key = `${day}_${exId}`;
+  const t = exTimers[key];
+  if (!t) return;
+  if (t.iv) { clearInterval(t.iv); t.iv = null; }
+  t.frozen = true;
+  getExData(day, exId).timeMs = t.elapsed;
+  const el = document.getElementById(`ext_${day}_${exId}`);
+  if (el) { el.classList.remove('running'); el.classList.add('frozen'); }
+}
+function updateExTimerDisplay(day, exId) {
+  const t  = exTimers[`${day}_${exId}`];
+  const el = document.getElementById(`ext_${day}_${exId}`);
+  if (el && t) el.textContent = fmtMinSec(t.elapsed);
+}
 
 // ═══════════════════════════════════════════
 //  ACTIVE EXERCISE
 // ═══════════════════════════════════════════
 function setActiveExercise(day, id) {
-  if (activeEx[day] === id) return;
+  const prev = activeEx[day];
+  if (prev === id) return;
+  // Pause the outgoing exercise timer
+  if (prev && prev !== 'warmup' && prev !== 'cooldown') pauseExTimer(day, prev);
   activeEx[day] = id;
   refreshActiveStates(day);
+  // Start the incoming exercise timer (unless it's an activity or already frozen)
+  if (id && id !== 'warmup' && id !== 'cooldown') {
+    const t = getExTimer(day, id);
+    if (!t.frozen) startExTimer(day, id);
+  }
 }
 
 function refreshActiveStates(day) {
@@ -635,7 +710,7 @@ function getExData(day, id) {
     const ex = WK[day].exercises.find(e => e.id === id);
     session[day].exercises[id] = {
       sets: Array.from({length: ex ? ex.sets : 3}, () => ({w:'', r:'', done:false})),
-      note: ''
+      note: '', timeMs: 0
     };
   }
   return session[day].exercises[id];
@@ -899,6 +974,7 @@ function buildCard(ex, day) {
         <div class="ex-right">
           <div class="ex-target">${ex.sets} &times; ${ex.reps}</div>
           <div class="ex-rest">rest ${ex.rest} s</div>
+          <div class="ex-timer${allDone ? ' frozen' : ''}" id="ext_${day}_${ex.id}">${data.timeMs > 0 ? fmtMinSec(data.timeMs) : '00:00'}</div>
           <div class="${dotCls}" id="dot_${ex.id}"></div>
         </div>
       </div>
@@ -947,7 +1023,10 @@ function toggleDone(day, exId, idx) {
   updateProgress(day);
   scheduleAutoSave();
   // Auto-advance when all sets of this exercise are done
-  if (d.sets.every(s => s.done)) autoAdvance(day, exId);
+  if (d.sets.every(s => s.done)) {
+    freezeExTimer(day, exId);
+    autoAdvance(day, exId);
+  }
 }
 
 function refreshCardState(day, exId) {
@@ -1132,6 +1211,8 @@ function clearDay() {
   session[currentTab] = { exercises:{}, activities:{} };
   // Kill any activity timers for this day
   Object.keys(actTimers).filter(k => k.endsWith('_'+currentTab)).forEach(k => { clearInterval(actTimers[k]?.iv); delete actTimers[k]; });
+  // Kill any exercise timers for this day
+  Object.keys(exTimers).filter(k => k.startsWith(currentTab+'_')).forEach(k => { clearInterval(exTimers[k]?.iv); delete exTimers[k]; });
   const el = document.getElementById('exs-' + currentTab);
   if (el) el.innerHTML = buildActivityCard('warmup', currentTab) + WK[currentTab].exercises.map(ex => buildCard(ex, currentTab)).join('') + buildActivityCard('cooldown', currentTab);
   updateProgress(currentTab); setStatus('cleared');
@@ -1210,6 +1291,19 @@ window.onload = function() {
   renderAllDays();
   updateAllProgress();
   renderHistory();
+  // Restore per-exercise elapsed timers from session
+  ['A','B','C'].forEach(day => {
+    WK[day].exercises.forEach(ex => {
+      const d = session[day].exercises[ex.id];
+      if (d && d.timeMs > 0) {
+        const key = `${day}_${ex.id}`;
+        const frozen = d.sets.every(s => s.done);
+        exTimers[key] = { iv: null, elapsed: d.timeMs, frozen };
+        const el = document.getElementById(`ext_${day}_${ex.id}`);
+        if (el) { el.textContent = fmtMinSec(d.timeMs); if (frozen) el.classList.add('frozen'); }
+      }
+    });
+  });
   try {
     const sv = localStorage.getItem('gt_bw');
     if (sv) { const {bw,unit} = JSON.parse(sv); document.getElementById('bodyWeight').value = bw; setUnit(unit); }
