@@ -322,6 +322,8 @@
     .dc-resume{ margin-top: 14px; font-size: .76rem; color: var(--muted);
       cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
     .dc-resume:hover { color: var(--text); }
+    .dc-divider { border: none; border-top: 1px solid var(--border); margin: 20px auto; max-width: 280px; }
+    .dc-reset-note { font-size: .74rem; color: var(--muted); margin-bottom: 10px; }
 
     /* ── PER-EXERCISE TIMER ── */
     .ex-timer { font-size: .74rem; font-variant-numeric: tabular-nums; font-weight: 700;
@@ -1310,6 +1312,9 @@ function renderDayComplete(day) {
         <button class="btn btn-ghost btn-sm" onclick="switchTab('history')">&#128196; History</button>
       </div>
       <div class="dc-resume" onclick="resumeWorkout('${day}')">&#8617; Resume / edit Day ${day}</div>
+      <hr class="dc-divider">
+      <div class="dc-reset-note">Come back next week for Day ${day}?</div>
+      <button class="btn btn-ghost btn-sm" onclick="resetForNextWeek('${day}')">&#128260; Reset Day ${day} for next week</button>
     </div>`;
 
   // Hide the finish button so the completion card is the clear end-state
@@ -1329,6 +1334,56 @@ function resumeWorkout(day) {
   updateProgress(day);
   const fin = document.querySelector(`#panel-${day} .finish-btn`);
   if (fin) fin.style.display = '';
+}
+
+function resetForNextWeek(day) {
+  // Wipe session data for this day
+  session[day] = { exercises:{}, activities:{} };
+  delete completedDays[`${day}_${currentDate}`];
+  persistCompleted();
+  persistSession();
+
+  // Stop all timers for this day
+  clearInterval(wtTimers[day]); delete wtTimers[day]; delete wtStart[day]; delete wtPaused[day];
+  Object.keys(actTimers).filter(k => k.endsWith('_'+day))
+    .forEach(k => { clearInterval(actTimers[k]?.iv); delete actTimers[k]; });
+  Object.keys(exTimers).filter(k => k.startsWith(day+'_'))
+    .forEach(k => { clearInterval(exTimers[k]?.iv); delete exTimers[k]; });
+
+  // Reset timer display
+  const wt  = document.getElementById('wt-'+day);
+  const btn = document.getElementById('wt-btn-'+day);
+  if (wt)  wt.textContent = '00:00:00';
+  if (btn) btn.innerHTML  = '&#9654; Start';
+
+  // Show a brief "all clear" card, then the fresh exercise list
+  const el = document.getElementById('exs-' + day);
+  if (el) {
+    el.innerHTML = `
+      <div class="dc-wrap">
+        <div class="dc-icon">&#128197;</div>
+        <div class="dc-title" style="color:var(--accent-l)">Ready for next week!</div>
+        <div class="dc-date">Day ${day} has been cleared</div>
+        <div class="dc-btns" style="margin-top:22px;">
+          <button class="btn btn-primary" onclick="openFreshDay('${day}')">&#9654; Open Day ${day}</button>
+          <button class="btn btn-ghost btn-sm" onclick="switchTab('history')">&#128196; History</button>
+        </div>
+      </div>`;
+  }
+  const fin = document.querySelector(`#panel-${day} .finish-btn`);
+  if (fin) fin.style.display = '';
+  updateProgress(day);
+  setStatus('ready');
+}
+
+function openFreshDay(day) {
+  const el = document.getElementById('exs-' + day);
+  if (el) el.innerHTML =
+    buildActivityCard('warmup', day)
+    + WK[day].exercises.map(ex => buildCard(ex, day)).join('')
+    + buildActivityCard('cooldown', day);
+  refreshActiveStates(day);
+  updateProgress(day);
 }
 
 function finishWorkout(day) {
