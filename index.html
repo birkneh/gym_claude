@@ -975,6 +975,20 @@ function buildActivityCard(actKey, day) {
     </div>`;
 }
 
+// Soft background tint per muscle group
+function muscleColor(muscle) {
+  const m = muscle.toLowerCase();
+  if (m.includes('chest'))                                          return '#fef3f3';
+  if (m.includes('lat') || m.includes('back'))                     return '#f0f8ff';
+  if (m.includes('shoulder') || m.includes('delt'))                return '#f5f0ff';
+  if (m.includes('bicep') || m.includes('tricep'))                 return '#f0fdf5';
+  if (m.includes('quad') || m.includes('glute') ||
+      m.includes('hamstring') || m.includes('calf') ||
+      m.includes('calve') || m.includes('leg'))                    return '#fff8ed';
+  if (m.includes('core'))                                          return '#fefde8';
+  return '#f8f6ff';
+}
+
 function buildSetRows(ex, data, day) {
   let rows = '';
   for (let i = 0; i < data.sets.length; i++) {
@@ -1021,9 +1035,10 @@ function buildCard(ex, day) {
 
   const setCount = data.sets.length;
   const setLabel = doneCnt > 0 ? `${doneCnt}/${setCount}` : `${setCount} sets`;
+  const bgColor  = muscleColor(ex.muscle);
 
   return `
-    <div class="${cardCls} inactive" id="card_${ex.id}" onclick="setActiveExercise('${day}','${ex.id}')">
+    <div class="${cardCls} inactive" id="card_${ex.id}" style="background:${bgColor}" onclick="setActiveExercise('${day}','${ex.id}')">
       <div class="ex-hdr">
         <div class="ex-name-grp">
           <div class="ex-name">${ex.name}<a href="${demoUrl}" target="_blank" rel="noopener" class="demo-link" onclick="event.stopPropagation()">&#9654; Demo</a></div>
