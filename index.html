@@ -305,6 +305,24 @@
     .g-card  { box-shadow: 0 2px 10px rgba(99,102,241,.07), 0 1px 3px rgba(0,0,0,.06); }
     .h-entry { box-shadow: 0 2px 8px rgba(0,0,0,.05); }
 
+    /* ── DAY COMPLETE SCREEN ── */
+    .dc-wrap  { text-align: center; padding: 36px 20px 28px; }
+    .dc-icon  { font-size: 3.2rem; margin-bottom: 10px; }
+    .dc-title { font-size: 1.55rem; font-weight: 800; color: var(--green); margin-bottom: 4px; }
+    .dc-date  { font-size: .83rem; color: var(--muted); margin-bottom: 24px; }
+    .dc-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px;
+      margin: 0 auto 24px; max-width: 380px; }
+    .dc-stat  { background: var(--card2); border-radius: 10px; padding: 14px 8px;
+      border: 1px solid var(--border); box-shadow: 0 1px 4px rgba(0,0,0,.04); }
+    .dc-stat-val { font-size: 1.12rem; font-weight: 800; }
+    .dc-stat-lbl { font-size: .67rem; color: var(--muted); margin-top: 4px;
+      text-transform: uppercase; letter-spacing: .05em; }
+    .dc-next  { font-size: .85rem; color: var(--muted); margin-bottom: 18px; }
+    .dc-btns  { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+    .dc-resume{ margin-top: 14px; font-size: .76rem; color: var(--muted);
+      cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+    .dc-resume:hover { color: var(--text); }
+
     /* ── PER-EXERCISE TIMER ── */
     .ex-timer { font-size: .74rem; font-variant-numeric: tabular-nums; font-weight: 700;
       color: var(--muted); letter-spacing: .04em; padding: 2px 6px;
@@ -603,6 +621,9 @@ let activeEx  = {};    // { A: 'A1' | 'warmup' | 'cooldown' | null }
 // Per-exercise elapsed timers
 let exTimers  = {};    // { 'A_A1': { iv: intervalId|null, elapsed: ms, frozen: bool } }
 
+// Days finished today
+let completedDays = {};  // { 'A_2026-04-27': summaryMeta }
+
 // ═══════════════════════════════════════════
 //  PER-EXERCISE TIMER
 // ═══════════════════════════════════════════
@@ -764,12 +785,21 @@ function loadStorage() {
     if (h) history = JSON.parse(h);
     const sv = localStorage.getItem('gt_session');
     if (sv) { const p = JSON.parse(sv); if (p.date === currentDate) session = p.data; }
+    // Restore today's completions only (drop old dates automatically)
+    const cd = localStorage.getItem('gt_completed');
+    if (cd) {
+      const parsed = JSON.parse(cd);
+      completedDays = Object.fromEntries(
+        Object.entries(parsed).filter(([k]) => k.endsWith('_' + currentDate))
+      );
+    }
   } catch(e) {}
   // Ensure activities key
   ['A','B','C'].forEach(d => { if (!session[d]) session[d] = {exercises:{}, activities:{}}; if (!session[d].activities) session[d].activities = {}; });
 }
-function persistHistory() { try { localStorage.setItem('gt_history', JSON.stringify(history)); } catch(e) {} }
-function persistSession()  { try { localStorage.setItem('gt_session',  JSON.stringify({date:currentDate, data:session})); } catch(e) {} }
+function persistHistory()  { try { localStorage.setItem('gt_history',   JSON.stringify(history));       } catch(e) {} }
+function persistSession()  { try { localStorage.setItem('gt_session',   JSON.stringify({date:currentDate, data:session})); } catch(e) {} }
+function persistCompleted(){ try { localStorage.setItem('gt_completed', JSON.stringify(completedDays)); } catch(e) {} }
 
 // ═══════════════════════════════════════════
 //  WORKOUT TIMER (stopwatch)
@@ -891,10 +921,14 @@ function renderAllDays() {
     const el = document.getElementById('exs-' + d);
     if (!el) return;
     if (!session[d].activities) session[d].activities = {};
-    el.innerHTML = buildActivityCard('warmup', d)
-      + WK[d].exercises.map(ex => buildCard(ex, d)).join('')
-      + buildActivityCard('cooldown', d);
-    refreshActiveStates(d);
+    if (completedDays[`${d}_${currentDate}`]) {
+      renderDayComplete(d);
+    } else {
+      el.innerHTML = buildActivityCard('warmup', d)
+        + WK[d].exercises.map(ex => buildCard(ex, d)).join('')
+        + buildActivityCard('cooldown', d);
+      refreshActiveStates(d);
+    }
   });
 }
 
@@ -1194,6 +1228,70 @@ function showSummary(day) {
 }
 function closeSummary() { document.getElementById('summary-modal').classList.add('hidden'); }
 
+// ═══════════════════════════════════════════
+//  DAY COMPLETE SCREEN
+// ═══════════════════════════════════════════
+const DAY_LABELS = { A:'Day A · Upper', B:'Day B · Lower', C:'Day C · Full Body' };
+const DAY_NEXT   = { A:'B', B:'C', C:'A' };
+
+function renderDayComplete(day) {
+  const m    = completedDays[`${day}_${currentDate}`];
+  const next = DAY_NEXT[day];
+  const dur  = m?.duration_ms > 0 ? fmtElapsed(m.duration_ms) : '—';
+  const pct  = m ? Math.round(m.doneSets / Math.max(m.totalSets, 1) * 100) : 0;
+  const vol  = m?.totalVolume > 0
+    ? m.totalVolume.toLocaleString() + ' kg'
+    : (m?.doneSets || 0) + ' sets';
+  const volLbl = m?.totalVolume > 0 ? 'Volume' : 'Sets Done';
+
+  const el = document.getElementById('exs-' + day);
+  if (!el) return;
+  el.innerHTML = `
+    <div class="dc-wrap">
+      <div class="dc-icon">&#127942;</div>
+      <div class="dc-title">Day ${day} Complete!</div>
+      <div class="dc-date">${fmtDate(currentDate)}</div>
+      <div class="dc-stats">
+        <div class="dc-stat">
+          <div class="dc-stat-val" style="color:var(--yellow)">${dur}</div>
+          <div class="dc-stat-lbl">Duration</div>
+        </div>
+        <div class="dc-stat">
+          <div class="dc-stat-val" style="color:var(--green)">${pct}%</div>
+          <div class="dc-stat-lbl">Completion</div>
+        </div>
+        <div class="dc-stat">
+          <div class="dc-stat-val" style="color:var(--accent-l)">${vol}</div>
+          <div class="dc-stat-lbl">${volLbl}</div>
+        </div>
+      </div>
+      <div class="dc-next">&#128197; Next up: <strong>${DAY_LABELS[next]}</strong></div>
+      <div class="dc-btns">
+        <button class="btn btn-primary" onclick="switchTab('${next}')">&#9654; Start ${DAY_LABELS[next]}</button>
+        <button class="btn btn-ghost btn-sm" onclick="switchTab('history')">&#128196; History</button>
+      </div>
+      <div class="dc-resume" onclick="resumeWorkout('${day}')">&#8617; Resume / edit Day ${day}</div>
+    </div>`;
+
+  // Hide the finish button so the completion card is the clear end-state
+  const fin = document.querySelector(`#panel-${day} .finish-btn`);
+  if (fin) fin.style.display = 'none';
+}
+
+function resumeWorkout(day) {
+  delete completedDays[`${day}_${currentDate}`];
+  persistCompleted();
+  const el = document.getElementById('exs-' + day);
+  if (el) el.innerHTML =
+    buildActivityCard('warmup', day)
+    + WK[day].exercises.map(ex => buildCard(ex, day)).join('')
+    + buildActivityCard('cooldown', day);
+  refreshActiveStates(day);
+  updateProgress(day);
+  const fin = document.querySelector(`#panel-${day} .finish-btn`);
+  if (fin) fin.style.display = '';
+}
+
 function finishWorkout(day) {
   // Pause the workout timer
   if (wtTimers[day]) {
@@ -1215,6 +1313,10 @@ function finishWorkout(day) {
       meta: summary });
     persistHistory(); persistSession(); setStatus('saved'); renderHistory();
   }
+  // Mark day as complete and swap the panel to the completion screen
+  completedDays[`${day}_${currentDate}`] = summary;
+  persistCompleted();
+  renderDayComplete(day);
   showSummary(day);
 }
 
@@ -1246,12 +1348,18 @@ function scheduleAutoSave() {
 function clearDay() {
   if (!confirm(`Clear all entries for Day ${currentTab}?`)) return;
   session[currentTab] = { exercises:{}, activities:{} };
+  delete completedDays[`${currentTab}_${currentDate}`];
+  persistCompleted();
   // Kill any activity timers for this day
   Object.keys(actTimers).filter(k => k.endsWith('_'+currentTab)).forEach(k => { clearInterval(actTimers[k]?.iv); delete actTimers[k]; });
   // Kill any exercise timers for this day
   Object.keys(exTimers).filter(k => k.startsWith(currentTab+'_')).forEach(k => { clearInterval(exTimers[k]?.iv); delete exTimers[k]; });
   const el = document.getElementById('exs-' + currentTab);
   if (el) el.innerHTML = buildActivityCard('warmup', currentTab) + WK[currentTab].exercises.map(ex => buildCard(ex, currentTab)).join('') + buildActivityCard('cooldown', currentTab);
+  refreshActiveStates(currentTab);
+  // Restore finish button if it was hidden
+  const fin = document.querySelector(`#panel-${currentTab} .finish-btn`);
+  if (fin) fin.style.display = '';
   updateProgress(currentTab); setStatus('cleared');
 }
 function setStatus(type) {
