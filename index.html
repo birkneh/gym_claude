@@ -1130,9 +1130,48 @@ function updateProgress(day) {
 function updateAllProgress() { ['A','B','C'].forEach(updateProgress); }
 
 // ═══════════════════════════════════════════
-//  TABS / DATE
+//  TABS / DATE  +  NEW-DAY AUTO-RESET
 // ═══════════════════════════════════════════
+
+// Called on every tab switch and on browser-tab focus.
+// If the calendar date has ticked over, wipe the session so the
+// user always starts fresh on a new day — even with the page left open.
+function checkDateReset() {
+  const today = todayStr();
+  if (today === currentDate) return;
+
+  currentDate = today;
+  document.getElementById('dateInput').value = today;
+
+  // Clear in-memory session & completions
+  session      = { A:{exercises:{},activities:{}}, B:{exercises:{},activities:{}}, C:{exercises:{},activities:{}} };
+  completedDays = {};
+  persistCompleted();
+  persistSession();
+
+  // Stop every running timer
+  ['A','B','C'].forEach(d => {
+    clearInterval(wtTimers[d]); delete wtTimers[d]; delete wtStart[d]; delete wtPaused[d];
+    Object.keys(actTimers).filter(k => k.endsWith('_'+d))
+      .forEach(k => { clearInterval(actTimers[k]?.iv); delete actTimers[k]; });
+    Object.keys(exTimers).filter(k => k.startsWith(d+'_'))
+      .forEach(k => { clearInterval(exTimers[k]?.iv); delete exTimers[k]; });
+    // Reset timer UI
+    const wt  = document.getElementById('wt-'+d);
+    const btn = document.getElementById('wt-btn-'+d);
+    const fin = document.querySelector(`#panel-${d} .finish-btn`);
+    if (wt)  wt.textContent  = '00:00:00';
+    if (btn) btn.innerHTML   = '&#9654; Start';
+    if (fin) fin.style.display = '';
+  });
+
+  renderAllDays();
+  updateAllProgress();
+  setStatus('ready');
+}
+
 function switchTab(tab) {
+  checkDateReset();          // auto-reset if the calendar day changed
   currentTab = tab;
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -1455,6 +1494,11 @@ window.onload = function() {
     else calcProtein();
   } catch(e) { calcProtein(); }
   setStatus('ready');
+
+  // Auto-reset when the user comes back to the browser tab on a new day
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) checkDateReset();
+  });
 };
 </script>
 </body>
